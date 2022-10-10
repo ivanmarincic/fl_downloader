@@ -13,6 +13,9 @@ class FlDownloader {
   static final StreamController<Progress> _progressStream =
       StreamController.broadcast();
 
+  static final StreamController<bool> _permissionStream =
+      StreamController.broadcast();
+
   static Stream<Progress> get progressStream => _progressStream.stream;
 
   /// Initializes the plugin and open the stream to listen to download progress
@@ -24,7 +27,24 @@ class FlDownloader {
           Progress._fromMap(<String, dynamic>{...map}),
         );
       }
+      if (call.method == 'permissionResult') {
+        final granted = call.arguments as bool;
+        _permissionStream.add(granted);
+      }
       return Future.value(null);
+    });
+  }
+
+  /// Request storage permission
+  static Future<bool> requestPermission() async {
+    if (Platform.isIOS) {
+      return Future.value(true);
+    }
+    return await _channel.invokeMethod('requestPermission').then((value) {
+      if (value == true || value == false) {
+        return Future.value(value);
+      }
+      return _permissionStream.stream.first;
     });
   }
 
