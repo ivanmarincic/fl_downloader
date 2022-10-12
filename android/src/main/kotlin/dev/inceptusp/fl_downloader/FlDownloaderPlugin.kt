@@ -43,7 +43,7 @@ class FlDownloaderPlugin : FlutterPlugin, MethodCallHandler, ActivityAware, Plug
     }
 
     fun requestStoragePermission(): Boolean? {
-        return if (Build.VERSION.SDK_INT >= 23) {
+        return if (Build.VERSION.SDK_INT >= 23 && Build.VERSION.SDK_INT <= 28) {
             if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
                 true
             } else {
@@ -67,8 +67,7 @@ class FlDownloaderPlugin : FlutterPlugin, MethodCallHandler, ActivityAware, Plug
         } else if (call.method == "openFile") {
             val downloadId: Int? = call.argument("downloadId")
             val filePath: String? = call.argument("filePath")
-            openFile(downloadId?.toLong(), filePath)
-            result.success(null)
+            result.success(openFile(downloadId?.toLong(), filePath))
         } else if (call.method == "cancel") {
             val downloadIds: LongArray = call.argument("downloadIds")!!
             val canceledDownloads = cancelDownload(*downloadIds)
@@ -137,7 +136,7 @@ class FlDownloaderPlugin : FlutterPlugin, MethodCallHandler, ActivityAware, Plug
         return manager.enqueue(request)
     }
 
-    fun openFile(downloadId: Long?, filePath: String?) {
+    fun openFile(downloadId: Long?, filePath: String?): Boolean {
         val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         var downloadedTo: String? = filePath
 
@@ -155,14 +154,19 @@ class FlDownloaderPlugin : FlutterPlugin, MethodCallHandler, ActivityAware, Plug
         val ext = MimeTypeMap.getFileExtensionFromUrl(fileUri.path)
         var type = mimeMap.getMimeTypeFromExtension(ext)
         if (type == null) type = "*/*"
-        val uri = FileProvider.getUriForFile(context, authority, File(fileUri.path!!))
-
-        context.startActivity(
-                Intent(Intent.ACTION_VIEW)
-                        .setDataAndType(uri, type)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        )
+        val file = File(fileUri.path!!)
+        val uri = FileProvider.getUriForFile(context, authority, file)
+        if (file.exists()) {
+            context.startActivity(
+                    Intent(Intent.ACTION_VIEW)
+                            .setDataAndType(uri, type)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
+            )
+            return true;
+        } else {
+            return false;
+        }
     }
 
     fun cancelDownload(vararg downloadIds: Long): Int {
